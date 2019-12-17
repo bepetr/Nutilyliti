@@ -7,7 +7,7 @@
 HardwareSerial simSerial(2); // SIM800L Tx & Rx is connected to ESP32 #16 & #17
 
 int flipTheSwitch = 23; // output pin for relay control
-String gateStatus = "NAN"; // save the current gate status
+int gateStatus = 0;
 String inMessage;
 
 /* Function prototypes */
@@ -26,11 +26,12 @@ void setup() {
 
   // Begin serial communication with Arduino IDE
   Serial.begin(9600);
+  //delay(10000);
   Serial.setTimeout(3000); // read 3 seconds of data from serial at once
 
   // Begin serial communication with ESP32 and SIM800L
   simSerial.begin(SerialDataBits, SERIAL_8N1, 16, 17); // 17 = RX, 16 = TX
-
+  
   Serial.println("Init...");
   delay(5000);
 
@@ -57,23 +58,25 @@ void readMessage(String inMessage/*, int mode*/) {
   inMessage.toUpperCase();
   Serial.println(inMessage);
   // open or close gate
-  if (inMessage.indexOf("OPEN") >= 0 && (gateStatus.indexOf("OPEN") == 0)) {
+  if ((inMessage.indexOf("OPEN") >= 0) && !gateStatus) {
     // Flip the relay and save the current state
     digitalWrite(flipTheSwitch, LOW);
-    gateStatus = "OPEN"; // gate is open
-    Serial.println(gateStatus);
+    gateStatus = 1; // gate is open
     Serial.println("Gate is open");
   }
-  else if (inMessage.indexOf("CLOSE") >= 0 && (gateStatus.indexOf("CLOSED") == 0)) {
+  else if ((inMessage.indexOf("CLOSE") >= 0) && gateStatus) {
     // Flip the relay and save the current state
     digitalWrite(flipTheSwitch, HIGH);
-    gateStatus = "CLOSED"; // gate is closed
+    gateStatus = 0; // gate is closed
     Serial.println("Gate is closed");
   }
   else if (inMessage.indexOf("STATUS") >= 0) {
     // send SMS back with gate status
-    //      String msg = "The gate is" + gateStatus;
-    //    sendSMS(msg, "37256623831");
+    String msg = "The gate is";
+    if (gateStatus) msg = msg + "open";
+    else msg = msg + "closed";
+    Serial.println(msg);
+    sendSMS(msg, "+37256623831"); // nt adminile
     Serial.println("Gate status request");
   }
   /*} else {
@@ -92,13 +95,23 @@ void readMessage(String inMessage/*, int mode*/) {
 }
 
 void checkAuthorization(String inMessage) {
+  if (inMessage.indexOf("STATUS") >= 0) {
+    // send SMS back with gate status
+    gateStatus = 0;
+    String msg = "The gate is";
+    if (gateStatus) msg = msg + "open";
+    else msg = msg + " closed";
+    Serial.println(msg);
+    sendSMS(msg, "+37256623831"); // nt adminile
+    Serial.println("Gate status request");
+  }
   char *buffer = (char*)malloc(sizeof(char) * 100);
   int i, r;
   String requestedState;
   int mode = -1; // 0 -> call, 1 -> sms
   strcpy(buffer, inMessage.c_str()); // convert input string to char*
   if (inMessage.indexOf("CMT") >= 0) { // SMS
-      Serial.println("sõnum");
+      //Serial.println("sõnum");
       char* p = strstr(buffer, "+CMT:"); // write message starting with cmt from buffer to *p
       p = strtok(p, ","); // split p into tokens -> , is the delimiter
       if (p != NULL) {
@@ -114,11 +127,12 @@ void checkAuthorization(String inMessage) {
             break;
           }
         }
-        if (r > 0) readMessage(requestedState/*, mode*/); // move on if authorization granted
+        if (r > 64) readMessage(requestedState/*, mode*/); // move on if authorization granted
+        else Serial.println("Unauthorized text message!");
       }
     }
     else { // CALL
-      Serial.println("kõne");
+      //Serial.println("kõne");
       char* p = strstr(buffer, "+CLIP:"); // write message starting with clip from buffer to *p
       p = strtok(p, ",");
       if (p != NULL) {
@@ -131,19 +145,19 @@ void checkAuthorization(String inMessage) {
         }
         simSerial.println("ATH"); // hang up the call
 
-        if (r > 0 && r < 128) { // if the contact was in the phonebook
+        if (r > 64) { // if the contact was in the phonebook
           Serial.println("Known and authorized caller!");
-          if (gateStatus.indexOf("CLOSED")) {
+          if (!gateStatus) {
             digitalWrite(flipTheSwitch, LOW);
-            gateStatus = "OPEN"; // gate is open
+            gateStatus = 1; // gate is open
             Serial.println("Gate is open");
-          } else if (gateStatus.indexOf("OPEN")) {
+          } else if (gateStatus) {
             digitalWrite(flipTheSwitch, HIGH);
-            gateStatus = "CLOSED"; // gate is closed
+            gateStatus = 0; // gate is closed
             Serial.println("Gate is closed");
           }
         } else {
-          Serial.println("Unknown number");
+          Serial.println("Unauthorized caller!");
         }
       }
     }
@@ -162,19 +176,21 @@ void loop() {
 void sendSMS(String message, String phoneNr) {
   // vaheta print-id write-ide vastu
   // send SMS to this number
-  simSerial.println("AT+CMGS= \"+");
-  simSerial.print(phoneNr);
-  simSerial.print("\"");
-  delay(100);
+  simSerial.println("AT+CMGS=\""+phoneNr+"\"");
+  updateSerial();
+  //delay(100);
   // send SMS
-  simSerial.println(message);
-  delay(100);
+  //char* sendThis = (char*)malloc(sizeof(char)*10);
+  //strcpy(sendThis, message.c_str()); // convert input string to char*
+  simSerial.print(message);
+  updateSerial();
+  //delay(100);
 
   // End AT command
   simSerial.write(26); // 'Ctrl+z'
   delay(100);
-  simSerial.println();
-
+ // simSerial.print();
+  //updateSerial();
   // give module some time to send SMS
   delay(5000);
 }
