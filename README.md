@@ -10,6 +10,4 @@ Seade peab olema võimalikult odav, väikeste mõõtmetega, töökindel ning tö
 
 Semestri lõpuks on valmis kõikide eelmainitud kommunikatsioonivõimalustega nutilüliti prototüüp-trükkplaat, mida on võimalik lülitada vähemalt kõne ja SMS-iga.
 
-Juhendaja: Oleg Sosnovski
-
 Arvutite ja süsteemide projekt. 2019
