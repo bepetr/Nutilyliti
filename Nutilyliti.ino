@@ -21,8 +21,7 @@ void updateSerial();
 */
 void setup() {
   pinMode(flipTheSwitch, OUTPUT);
-  // change?
-  digitalWrite(flipTheSwitch, HIGH); // off by default -> gate is closed
+  digitalWrite(flipTheSwitch, HIGH);
 
   // Begin serial communication with Arduino IDE
   Serial.begin(115200);
@@ -53,19 +52,15 @@ void setup() {
 }
 
 void readMessage(String inMessage, String phoneNr) {
-  //if (mode) {
   inMessage.toUpperCase();
-  Serial.println(inMessage);
   // open or close gate
-  if (((inMessage.indexOf("OPEN") >= 0) && !gateStatus) || !gateStatus) {
+  if (((inMessage.indexOf("OPEN") >= 0) && !gateStatus) || !gateStatus) { // 1st condition -> SMS; 2nd -> phone call
     // Flip the relay and save the current state
-    if (inMessage.indexOf("OPEN") >= 0) Serial.println("see oli sõnum");
-    else Serial.println("See oli kõne");
     digitalWrite(flipTheSwitch, LOW);
     gateStatus = 1; // gate is open
     Serial.println("Gate is open");
   }
-  else if (((inMessage.indexOf("CLOSE") >= 0) && gateStatus) || gateStatus) {
+  else if (((inMessage.indexOf("CLOSE") >= 0) && gateStatus) || gateStatus) { // 1st condition -> SMS; 2nd -> phone call
     // Flip the relay and save the current state
     if (inMessage.indexOf("CLOSE") >= 0) Serial.println("see oli sõnum");
     else Serial.println("See oli kõne");
@@ -92,7 +87,6 @@ void checkAuthorization(String inMessage) {
   int i, r;
   String requestedState = "";
   String phoneNr = "";
-  int mode = -1; // 0 -> call, 1 -> sms
   strcpy(buffer, inMessage.c_str()); // convert input string to char*
   if (inMessage.indexOf("CMT") >= 0) { // SMS
     Serial.println("sõnum");
@@ -102,7 +96,6 @@ void checkAuthorization(String inMessage) {
       for (i = r = 0; p != NULL; i++, p = strtok(NULL, "\"")) {
         if (i == 0) { // extract phone nr
           phoneNr = p;
-          Serial.println(phoneNr);
         }
         else if (i == 1) { // extract phone book entry
           if (p == NULL) r = 0; // no entry in phonebook
@@ -118,7 +111,6 @@ void checkAuthorization(String inMessage) {
     }
   }
   else { // CALL
-    //Serial.println("kõne");
     char* p = strstr(buffer, "+CLIP:"); // write message starting with clip from buffer to *p
     p = strtok(p, ",");
     if (p != NULL) {
@@ -151,26 +143,18 @@ void loop() {
   requested the SMS.
 */
 void sendSMS(String message, String phoneNr) {
-  // vaheta print-id write-ide vastu
-  // send SMS to this number
+  // send SMS to given number
   simSerial.println("AT+CMGS=\"" + phoneNr + "\"");
   updateSerial();
-  //delay(100);
-  // send SMS
-  //char* sendThis = (char*)malloc(sizeof(char)*10);
-  //strcpy(sendThis, message.c_str()); // convert input string to char*
   simSerial.print(message);
   updateSerial();
-  //delay(100);
 
   // End AT command
   simSerial.write(26); // 'Ctrl+z'
-  delay(100);
-  // simSerial.print();
-  //updateSerial();
   // give module some time to send SMS
   delay(5000);
 }
+
 /*
   Function for SIM module setup.
   Can be used for real-time configuration of the SIM card
