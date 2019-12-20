@@ -129,7 +129,7 @@ void checkAuthorization(String inMessage) {
 }
 
 void loop() {
-  updateSerial(); // to update the sim configuration via serial monitor
+  //updateSerial(); // to update the sim configuration via serial monitor -> comment out during normal operation
   if (simSerial.available()) {
     inMessage = simSerial.readString();
     checkAuthorization(inMessage);
